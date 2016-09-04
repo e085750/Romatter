@@ -7,6 +7,7 @@ class Twit
   public:
     Twit();
     ~Twit();
+    //Twit& operator=(const Twit& rhs);
     //twitCurl twitterObj;
     twitCurlEx twitterObj;
     std::string tmpStr, tmpStr2, replyMsg;
@@ -16,6 +17,5 @@ class Twit
 
   public:
     void post(const char *text);
-    void read_timeline();
-    int64_t last_id;
+    bool read_timeline(std::string& resp, int64_t last_id);
 };

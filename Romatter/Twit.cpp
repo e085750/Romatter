@@ -1,15 +1,21 @@
 #include "Twit.h"
-#include "picojson.h"
 #include "oauth_info.h"
 #include <stdint.h>
 #include <exception>
+
+//Twit& Twit::operator=(const Twit& t)
+//{
+//  this->userName = t.userName;
+//  this->passWord = t.passWord;
+//  this->twitterObj = t.twitterObj;
+//  return *this;
+//}
 
 Twit::Twit()
 {
     std::string replyMsg = "";
     userName = "";
     passWord = "";
-    last_id = 1;
     /* Set twitter username and password */
     twitterObj.setTwitterUsername( userName );
     twitterObj.setTwitterPassword( passWord );
@@ -101,9 +107,9 @@ Twit::Twit()
     //printf( "auth end\n" );
 }
 
-void Twit::read_timeline()
+bool Twit::read_timeline(std::string& resp, int64_t last_id)
 {
-    int count = 1;
+    int count = 100;
     std::stringstream ss;
     ss << "?count=";
     ss << count;
@@ -111,65 +117,15 @@ void Twit::read_timeline()
     ss << last_id;
 
     std::cout << ss.str() << std::endl;
-    try { 
-    if( twitterObj.timelinePublicGet(ss.str()))
-    {
-        twitterObj.getLastWebResponse( replyMsg );
-
-        picojson::value v;
-        std::string err = picojson::parse(v, replyMsg);
-        if (! err.empty()) {
-          std::cerr << err << std::endl;
-          return;
-          //exit(1);
-        }
-
-        if (v.is<picojson::object>()) {
-          picojson::object po = v.get<picojson::object>();
-          picojson::array array = po["error"].get<picojson::array>();
-          for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
-            picojson::object& o = it->get<picojson::object>();
-            std::string message = o["message"].get<std::string>();
-            int code = (int)o["message"].get<bool>();
-
-            std::cout << message << " code: " << code << std::endl;
-            
-          }
-          return;
-        }
-        std::string user;
-        std::string tweet;
-        picojson::array array = v.get<picojson::array>();
-        for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
-          picojson::object& o = it->get<picojson::object>();
-          picojson::object& user_o = o["user"].get<picojson::object>();
-          user = user_o["name"].get<std::string>();
-
-          tweet = o["text"].get<std::string>();
-
-          if((int64_t)o["id"].get<double>() > last_id) {
-            last_id = (int64_t)o["id"].get<double>();
-          } else if((int64_t)o["id"].get<double>() == last_id) {
-            last_id = (int64_t)o["id"].get<double>() + 1;
-          }
-
-          std::cout << "user: " << user << std::endl;
-          std::cout << "tweet: " << tweet << std::endl;
-          std::cout << std::endl;
-        }
-        
+    if( twitterObj.timelinePublicGet(ss.str())) {
+      twitterObj.getLastWebResponse( replyMsg );
+      resp = replyMsg;
+      return true;
+    } else {
+      twitterObj.getLastCurlError( replyMsg );
     }
-    else
-    {
-        twitterObj.getLastCurlError( replyMsg );
-        printf( "\ntwitterClient:: twitCurl::timelinePublicGet error:\n%s\n", replyMsg.c_str() );
-    }
-    } catch (std::exception e) {
-      std::cout << "exception: " << e.what() << std::endl;
-    } catch (...) {
-      std::cout << "get timelien error" << std::endl;
-    }
-  
+
+    return false;
 }
 
 
@@ -198,6 +154,5 @@ void Twit::post(const char *text)
     twitterObj.getLastCurlError( replyMsg );
     printf( "\ntwitterClient:: twitCurl::statusUpdate error:\n%s\n", replyMsg.c_str() );
     twitterObj.getLastWebResponse( replyMsg );
-    printf( "\ntwitterClient:: twitCurl::statusUpdate web response:\n%s\n", replyMsg.c_str() );
   }
 }
