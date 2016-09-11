@@ -1,10 +1,14 @@
-#include "MyFrame.h"
 #include <fstream>
 #include <sstream>
+#include "MyFrame.h"
 #include "picojson.h"
 #include "Twit.h"
 #include "MyApp.h"
+#include "MyText.h"
+#include <wx/aui/auibook.h>
+#include <wx/choice.h>
 
+class MyFrame;
 wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
   //EVT_CLOSE(MyFrame::OnClose)
   EVT_MENU(ID_Hello,   MyFrame::OnHello)
@@ -12,7 +16,8 @@ wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
   EVT_MENU(wxID_ABOUT, MyFrame::OnAbout)
   EVT_TEXT_ENTER(ID_post, MyFrame::post)
   EVT_TIMER(readTimeline_Timer, MyFrame::read_timeline)
-  EVT_TEXT_URL(wxID_ANY, MyFrame::OnTextURL)
+  EVT_TEXT_URL(tl_box, MyFrame::OnTextURL)
+  EVT_CHOICE(ID_CHOICE, MyFrame::OnChoice)
 wxEND_EVENT_TABLE()
 
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
@@ -34,41 +39,73 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
   last_id = 1;
   twit = new Twit();
 
-    wxPanel* p = new wxPanel(this, wxID_ANY);
-    wxBoxSizer *topsizer = new wxBoxSizer( wxVERTICAL );
+  wxPanel* p = new wxPanel(this, wxID_ANY);
+  wxBoxSizer *topsizer = new wxBoxSizer( wxVERTICAL );
 
-    // 2) top: create wxTextCtrl with minimum size (100x60)
-    post_text = new wxTextCtrl( p, ID_post, wxT(""), wxDefaultPosition, wxSize(50,30), wxTE_PROCESS_ENTER);
-    topsizer->Add(post_text,
-        wxSizerFlags().Expand().Border(wxLEFT|wxRIGHT, 5));
-        
-    // 4) create two centred wxButtons
-    //wxBoxSizer *button_box = new wxBoxSizer( wxHORIZONTAL );
-    //button_box->Add(
-    //    new wxButton(p, ID_read_timeline, wxT("read timeline")),
-    //    wxSizerFlags().Border(wxALL, 7));
-    //button_box->Add(
-    //    new wxButton(p, ID_post, wxT("post") ),
-    //    wxSizerFlags().Border(wxALL, 7));
+  post_text = new wxTextCtrl( p, ID_post, wxT(""), wxDefaultPosition, wxSize(50,30), wxTE_PROCESS_ENTER);
+  topsizer->Add(post_text,
+      wxSizerFlags().Expand().Border(wxLEFT|wxRIGHT, 5));
 
-    //topsizer->Add(button_box, wxSizerFlags().Center());
+  // create the notebook off-window to avoid flicker
+  //wxSize client_size = GetClientSize();
 
-    // 2) top: create wxTextCtrl with minimum size (100x60)
-    tl = new wxTextCtrl( p, wxID_ANY, wxT(" tl"), wxDefaultPosition, wxSize(100,60), wxTE_READONLY | wxTE_MULTILINE | wxTE_AUTO_URL);
-    topsizer->Add(tl, wxSizerFlags(1).Expand().Border(wxALL, 5));
+  long m_notebook_style = wxAUI_NB_TOP | wxAUI_NB_TAB_SPLIT | wxAUI_NB_TAB_MOVE | wxAUI_NB_SCROLL_BUTTONS;
+  wxAuiNotebook* ctrl = new wxAuiNotebook(p, wxID_ANY
+      , wxDefaultPosition
+      , wxSize(300,800) 
+      , m_notebook_style
+      );
+  ctrl->Freeze();
 
-    p->SetSizer( topsizer );
+  tl = new wxTextCtrl( ctrl, tl_box, wxT("tl"), wxDefaultPosition, wxSize(100,60), wxTE_READONLY | wxTE_MULTILINE | wxTE_AUTO_URL);
+  ctrl->AddPage( tl, wxT("tl") ); 
 
-    // don't allow frame to get smaller than what the sizers tell it and also set
-    // the initial size as calculated by the sizers
-    topsizer->SetSizeHints( this );
-    read_timeline();
-    StartTimer();
+  wxPanel* list_p = new wxPanel(ctrl, wxID_ANY);
+  wxBoxSizer *list_topsizer = new wxBoxSizer( wxVERTICAL );
+
+  wxChoice* list_c = new wxChoice(list_p, ID_CHOICE, wxDefaultPosition
+      ,wxDefaultSize, 0, NULL, wxCB_SORT, wxDefaultValidator
+      , wxChoiceNameStr);
+  list_topsizer->Add(list_c, wxSizerFlags().Expand().Border(wxLEFT|wxRIGHT, 5));
+  wxArrayString items;
+  items.Add(wxT("hoge"));
+  items.Add(wxT("foo"));
+  list_c->Set(items);
+  //list_c->SetColumns(2); 
+  //list_c->SetString(0, wxT("hoge"));
+  //list_c->SetString(1, wxT("foo"));
+
+  list = new wxTextCtrl( list_p, tl_box, wxT("list"), wxDefaultPosition, wxSize(100,60), wxTE_READONLY | wxTE_MULTILINE | wxTE_AUTO_URL);
+  list_topsizer->Add(list, wxSizerFlags(1).Expand().Border(wxALL, 5));
+  list_p->SetSizer( list_topsizer );
+  ctrl->AddPage(list_p, wxT("list") ); 
+
+  topsizer->Add(ctrl,
+      wxSizerFlags(1).Expand().Border(wxALL, 5));
+
+
+  p->SetSizer( topsizer );
+
+  ctrl->Thaw();
+  // don't allow frame to get smaller than what the sizers tell it and also set
+  // the initial size as calculated by the sizers
+  topsizer->SetSizeHints( this );
+  read_timeline();
+  StartTimer();
 }
 
 MyFrame::~MyFrame()
 {
-  delete twit;
+  //TODO double free or corruption
+  //delete twit;
+  //delete post_text;
+  //delete tl;
+}
+
+void MyFrame::OnChoice(wxCommandEvent& event)
+{
+    long sel = event.GetSelection();
+    printf("Choice item %ld selected\n", sel);
 }
 
 void MyFrame::OnTextURL(wxTextUrlEvent& event)
@@ -89,7 +126,7 @@ void MyFrame::OnTextURL(wxTextUrlEvent& event)
 
 void MyFrame::StartTimer()
 {
-    static const int INTERVAL = 60000;
+    static const int INTERVAL = 70000;
 
     //wxLogMessage(wxT("Launched progress timer (interval = %d ms)"), INTERVAL);
 
@@ -117,67 +154,126 @@ void MyFrame::OnHello(wxCommandEvent& event)
 
 void MyFrame::read_timeline()
 {
-    tl->SetInsertionPoint(1);
-    std::string resp = "";
-    twit->read_timeline(resp, last_id);
-    picojson::value v;
-    try { 
-      std::string err = picojson::parse(v, resp);
-      if (! err.empty()) {
-        std::cerr << "json parse error: " << err << std::endl;
-        return;
-        //exit(1);
-      }
+  std::string resp = "";
+  twit->read_timeline(resp, last_id);
+  picojson::value v;
+  try { 
+    std::string err = picojson::parse(v, resp);
+    if (! err.empty()) {
+      std::cerr << "json parse error: " << err << std::endl;
+      return;
+      //exit(1);
+    }
 
-      if (v.is<picojson::object>()) {
-        picojson::object po = v.get<picojson::object>();
-        picojson::array array = po["error"].get<picojson::array>();
-        for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
-          picojson::object& o = it->get<picojson::object>();
-          std::string message = o["message"].get<std::string>();
-          int code = (int)o["message"].get<bool>();
-
-          std::cout << message << " code: " << code << std::endl;
-
-        }
-        return;
-      }
-      //std::stringstream ss;
-      std::string user;
-      std::string tweet;
-      picojson::array array = v.get<picojson::array>();
+    if (v.is<picojson::object>()) {
+      picojson::object po = v.get<picojson::object>();
+      picojson::array array = po["error"].get<picojson::array>();
       for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
         picojson::object& o = it->get<picojson::object>();
-        picojson::object& user_o = o["user"].get<picojson::object>();
-        user = user_o["name"].get<std::string>();
+        std::string message = o["message"].get<std::string>();
+        int code = (int)o["message"].get<bool>();
 
-        tweet = o["text"].get<std::string>();
+        std::cout << message << " code: " << code << std::endl;
 
-        if((int64_t)o["id"].get<double>() > last_id) {
-          last_id = (int64_t)o["id"].get<double>();
-        } else if((int64_t)o["id"].get<double>() == last_id) {
-          last_id = (int64_t)o["id"].get<double>() + 1;
-        }
-
-        std::string str = user;
-        str += ":\t";
-        str += tweet;
-        str += "\n";
-        tl->WriteText(wxString::FromUTF8(str.c_str()));
       }
-    } catch (std::exception e) {
-      std::cout << "exception: " << e.what() << " " << resp << std::endl;
-    } catch (...) {
-      std::cout << "get timelien error" << " " << resp << std::endl;
+      return;
     }
-    wxString text = tl->GetValue();
-    std::string str(text.utf8_str());
-    if (5000 < str.length()) {
-      printf("delete. 5000, %d\n", (int)str.length());
-      tl->Remove(5000, str.length()); 
-    } else {
-      printf("no delete. length %d\n", (int)str.length());
+    //std::stringstream ss;
+    std::string user;
+    std::string tweet;
+    picojson::array array = v.get<picojson::array>();
+    wxTextAttr backgroundColourAttr;
+    backgroundColourAttr.SetBackgroundColour(*wxGREEN);
+    backgroundColourAttr.SetTextColour(*wxBLUE);
+    wxTextAttr backgroundColourAttrDef;
+    backgroundColourAttrDef.SetBackgroundColour(*wxWHITE);
+    backgroundColourAttrDef.SetTextColour(*wxBLACK);
+    for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
+      picojson::object& o = it->get<picojson::object>();
+      picojson::object& user_o = o["user"].get<picojson::object>();
+      user = user_o["name"].get<std::string>();
+
+      tweet = o["text"].get<std::string>();
+
+      if((int64_t)o["id"].get<double>() > last_id) {
+        last_id = (int64_t)o["id"].get<double>();
+      } else if((int64_t)o["id"].get<double>() == last_id) {
+        last_id = (int64_t)o["id"].get<double>() + 1;
+      }
+
+      std::string str = user;
+      str += ":\n";
+      tl->SetDefaultStyle(wxTextAttr(backgroundColourAttr));
+      tl->WriteText(wxString::FromUTF8(str.c_str()));
+      str = tweet;
+      str += "\n";
+      tl->SetDefaultStyle(wxTextAttr(backgroundColourAttrDef));
+      tl->WriteText(wxString::FromUTF8(str.c_str()));
     }
+  } catch (std::exception e) {
+    std::cout << "exception: " << e.what() << " " << resp << std::endl;
+  } catch (...) {
+    std::cout << "get timelien error" << " " << resp << std::endl;
+  }
+  wxString text = tl->GetValue();
+  std::string str(text.utf8_str());
+  //TODO set max lange
+  if (5000 < str.length()) {
+    printf("delete. 5000, %d\n", (int)str.length());
+   // tl->Remove(5000, str.length()); 
+  } else {
+    printf("no delete. length %d\n", (int)str.length());
+  }
+  tl->SetInsertionPoint(0);
+  
+  //test
+  get_list();
+
+}
+
+void MyFrame::get_list()
+{
+  std::string resp = "hoge";
+  twit->get_list(resp, "pocaRingoRA");
+  //printf("%s\n", resp.c_str());
+  picojson::value v;
+  try { 
+    std::string err = picojson::parse(v, resp);
+    if (! err.empty()) {
+      std::cerr << "json parse error: " << err << std::endl;
+      return;
+    }
+
+    if (v.is<picojson::object>()) {
+      picojson::object po = v.get<picojson::object>();
+      picojson::array array = po["error"].get<picojson::array>();
+      for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
+        picojson::object& o = it->get<picojson::object>();
+        std::string message = o["message"].get<std::string>();
+        int code = (int)o["message"].get<bool>();
+
+        std::cout << message << " code: " << code << std::endl;
+
+      }
+      return;
+    }
+    //std::stringstream ss;
+    std::string slug;
+    std::string owner;
+    picojson::array array = v.get<picojson::array>();
+    for (picojson::array::iterator it = array.begin(); it != array.end(); it++) {
+      picojson::object& o = it->get<picojson::object>();
+      slug = o["slug"].get<std::string>();
+      picojson::object& user_o = o["user"].get<picojson::object>();
+      owner = user_o["screen_name"].get<std::string>();
+
+      printf("list %s, owner %s\n", slug.c_str(), owner.c_str());
+    }
+  } catch (std::exception e) {
+    std::cout << "exception: " << e.what() << " " << resp << std::endl;
+  } catch (...) {
+    std::cout << "get timelien error" << " " << resp << std::endl;
+  }
 }
 
 void MyFrame::read_timeline(wxCommandEvent& event)

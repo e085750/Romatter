@@ -1,17 +1,19 @@
 #include <wx/wxprec.h>
 #ifndef WX_PRECOMP
   #include <wx/wx.h>
-  #include "wx/timer.h"
 #endif
-
+class wxRichTextCtrl;
+class wxFrame;
 class Twit;
-class MyThread;
+class wxTextCtrl;
 enum
 {
   ID_Hello = 1,
   ID_read_timeline,
   ID_post,
-  readTimeline_Timer
+  readTimeline_Timer,
+  tl_box,
+  ID_CHOICE
 };
 
 class MyFrame: public wxFrame
@@ -25,6 +27,7 @@ class MyFrame: public wxFrame
   public:
     Twit *twit;
     wxTextCtrl *tl;
+    wxTextCtrl *list;
 
   private:
     void OnHello(wxCommandEvent& event);
@@ -33,8 +36,11 @@ class MyFrame: public wxFrame
     void read_timeline(wxCommandEvent& event);
     void post(wxCommandEvent& event);
     void OnTextURL(wxTextUrlEvent& event);
+    void get_list();
+    void OnChoice(wxCommandEvent& event);
     int64_t last_id;
     wxTextCtrl *post_text;
+    
   protected:
     // the timer for simulating gauge progress
     wxTimer *m_timer;
